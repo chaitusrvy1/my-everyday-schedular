@@ -1,0 +1,5 @@
+{
+  "name": "MorningZen - Daily Task & Motivation Scheduler",
+  "description": "A comprehensive task management dashboard that integrates with Gemini to generate personalized daily morning briefings, quotes, and action item reminders. Designed to work with a FastAPI backend, Supabase for long-term storage, and Brevo for email delivery.",
+  "requestFramePermissions": []
+}
