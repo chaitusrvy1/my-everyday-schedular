@@ -26,7 +26,7 @@ export interface MorningBriefing {
 export interface UserSettings {
   email: string;
   preferredMorningTime: string; // HH:mm
+  backendUrl?: string;
   brevoApiKey?: string;
   supabaseUrl?: string;
-  supabaseAnonKey?: string;
 }

@@ -1,41 +1,63 @@
 
-# Deploying Your MorningZen System for Free
+# FastAPI + Supabase Integration Guide
 
-To fulfill the "years without disturbance" requirement, follow this architecture:
+To connect your **MorningZen** frontend to your permanent backend, your FastAPI app should expose the following endpoints.
 
-## 1. Backend (FastAPI)
-Deploy a FastAPI server to **Render** or **Railway** (free tiers).
-- Use `APScheduler` to run a job daily.
-- The job should query Supabase for users who have a "preferredMorningTime" matching the current hour.
-- Send a request to Gemini (or use your internal logic) to get the briefing text.
-- Use the **Brevo API** to send the email.
-
-## 2. Database (Supabase)
-- Create a `tasks` table and a `settings` table.
-- Use the Supabase Free Tier (PostgreSQL). It will run forever as long as there is some activity every few months.
-
-## 3. Email (Brevo)
-- Sign up for a free account.
-- Get your API Key.
-- You get 300 emails/day for free, which is perfect for personal use.
-
-## 4. Example FastAPI Cron Job Code
-```python
-from apscheduler.schedulers.background import BackgroundScheduler
-import requests
-
-def send_daily_briefing():
-    # 1. Fetch users from Supabase
-    # 2. For each user, fetch today's tasks
-    # 3. Generate content with Gemini
-    # 4. Send via Brevo
-    print("Briefing sent!")
-
-scheduler = BackgroundScheduler()
-scheduler.add_job(send_daily_briefing, 'cron', hour=8, minute=0)
-scheduler.start()
+### 1. Requirements
+Install these dependencies:
+```bash
+pip install fastapi uvicorn supabase apscheduler pydantic sendinblue
 ```
 
-## 5. Frontend (React)
-- Deploy this application to **Vercel** or **Netlify** (Free).
-- It communicates with your FastAPI backend endpoints for persistence.
+### 2. FastAPI Core Structure (`main.py`)
+```python
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import List, Optional
+from supabase import create_client, Client
+import os
+
+app = FastAPI()
+
+# Supabase setup
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_ANON_KEY")
+supabase: Client = create_client(url, key)
+
+class TaskSchema(BaseModel):
+    title: str
+    description: Optional[str] = ""
+    date: str
+    priority: str
+    completed: bool = False
+
+@app.get("/tasks", response_model=List[TaskSchema])
+async def get_tasks():
+    # Fetch from Supabase
+    response = supabase.table("tasks").select("*").execute()
+    return response.data
+
+@app.post("/tasks")
+async def create_task(task: TaskSchema):
+    # Insert into Supabase
+    data, count = supabase.table("tasks").insert(task.dict()).execute()
+    return data[1][0] # Return the created task
+
+@app.patch("/tasks/{task_id}/toggle")
+async def toggle_task(task_id: str):
+    # Get current state and flip it
+    res = supabase.table("tasks").select("completed").eq("id", task_id).execute()
+    new_state = not res.data[0]['completed']
+    supabase.table("tasks").update({"completed": new_state}).eq("id", task_id).execute()
+    return {"status": "success"}
+
+@app.delete("/tasks/{task_id}")
+async def delete_task(task_id: str):
+    supabase.table("tasks").delete().eq("id", task_id).execute()
+    return {"status": "deleted"}
+```
+
+### 3. Deploying for "Years of No Disturbance"
+- **Render.com**: Connect your GitHub. It will automatically build and deploy.
+- **Supabase**: Set up a free project. Use the "Project Settings" to find your URL and API Keys.
+- **Environment Variables**: Make sure to set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `GEMINI_API_KEY` in your Render dashboard.
