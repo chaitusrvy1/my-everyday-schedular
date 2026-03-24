@@ -5,3 +5,4 @@ supabase
 httpx
 google-genai
 uvicorn
+python-dotenv

@@ -10,6 +10,13 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 from google import genai
 from google.genai import types
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+# Try root first, then api/
+load_dotenv()
+load_dotenv(os.path.join(os.getcwd(), ".env"))
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 # Standard FastAPI initialization for Vercel
 app = FastAPI()
@@ -22,19 +29,70 @@ app.add_middleware(
 )
 
 # Environment Variables
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY")
-BREVO_KEY = os.environ.get("BREVO_API_KEY")
-SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+# Try multiple names for each key to be robust
+def get_env_robust(keys: List[str]):
+    for key in keys:
+        val = os.environ.get(key)
+        if val and not is_placeholder(val):
+            return val
+    return None
+
+SUPABASE_URL = get_env_robust(["SUPABASE_URL", "VITE_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"])
+SUPABASE_KEY = get_env_robust([
+    "SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_KEY", "SUPABASE_SERVICE_ROLE_KEY"
+])
+BREVO_KEY = get_env_robust(["BREVO_API_KEY", "VITE_BREVO_API_KEY", "SENDINBLUE_API_KEY"])
+SENDER_EMAIL = get_env_robust(["SENDER_EMAIL", "VITE_SENDER_EMAIL", "BREVO_SENDER_EMAIL"])
+GEMINI_API_KEY = get_env_robust(["GEMINI_API_KEY", "VITE_GEMINI_API_KEY", "GOOGLE_API_KEY", "API_KEY"])
+
+def is_placeholder(val):
+    if not val: return True
+    placeholders = [
+        "your_supabase_project_url", 
+        "your_supabase_anon_key", 
+        "your_google_ai_studio_api_key", 
+        "your_brevo_api_key", 
+        "your_verified_brevo_sender_email"
+    ]
+    return val in placeholders
+
+def mask_key(key):
+    if not key: return "MISSING"
+    if is_placeholder(key): return "PLACEHOLDER"
+    if len(key) < 8: return "***"
+    return f"{key[:4]}...{key[-4:]}"
+
+print(f"DEBUG: SUPABASE_URL: {SUPABASE_URL}")
+print(f"DEBUG: SUPABASE_KEY: {mask_key(SUPABASE_KEY)}")
+print(f"DEBUG: BREVO_KEY: {mask_key(BREVO_KEY)}")
+print(f"DEBUG: SENDER_EMAIL: {SENDER_EMAIL}")
+print(f"DEBUG: GEMINI_API_KEY: {mask_key(GEMINI_API_KEY)}")
 
 # Safe Initialization
 supabase: Optional[Client] = None
-if SUPABASE_URL and SUPABASE_KEY:
-    try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
-        print(f"Supabase Init Error: {e}")
+
+def get_supabase_client():
+    global supabase
+    if supabase:
+        return supabase
+    
+    url = get_env_robust(["SUPABASE_URL", "VITE_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"])
+    key = get_env_robust([
+        "SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_KEY", "SUPABASE_SERVICE_ROLE_KEY"
+    ])
+    
+    if url and key:
+        try:
+            supabase = create_client(url, key)
+            return supabase
+        except Exception as e:
+            print(f"Supabase Init Error: {e}")
+    return None
+
+# Initial attempt
+get_supabase_client()
 
 class TaskItem(BaseModel):
     id: Optional[str] = None
@@ -137,62 +195,101 @@ def get_simple_briefing(tasks):
 
 @app.get("/api/health")
 async def health():
+    # Re-read env vars to catch changes without restart if possible
+    # Note: os.environ is updated if the process environment changes, 
+    # but usually a full restart is needed for AI Studio settings.
+    
+    current_supabase_url = get_env_robust(["SUPABASE_URL", "VITE_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"])
+    current_supabase_key = get_env_robust([
+        "SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_KEY", "SUPABASE_SERVICE_ROLE_KEY"
+    ])
+    current_brevo_key = get_env_robust(["BREVO_API_KEY", "VITE_BREVO_API_KEY", "SENDINBLUE_API_KEY"])
+    current_sender_email = get_env_robust(["SENDER_EMAIL", "VITE_SENDER_EMAIL", "BREVO_SENDER_EMAIL"])
+    current_gemini_key = get_env_robust(["GEMINI_API_KEY", "VITE_GEMINI_API_KEY", "GOOGLE_API_KEY", "API_KEY"])
+
     return {
         "status": "online",
-        "supabase": supabase is not None,
-        "brevo": BREVO_KEY is not None,
-        "sender": SENDER_EMAIL,
+        "supabase": current_supabase_url is not None and current_supabase_key is not None,
+        "brevo": current_brevo_key is not None and current_sender_email is not None,
+        "gemini": current_gemini_key is not None,
+        "env_vars": {
+            "SUPABASE_URL": current_supabase_url is not None,
+            "SUPABASE_ANON_KEY": current_supabase_key is not None,
+            "BREVO_API_KEY": current_brevo_key is not None,
+            "SENDER_EMAIL": current_sender_email is not None,
+            "GEMINI_API_KEY": current_gemini_key is not None,
+        },
+        "masked_vars": {
+            "SUPABASE_URL": current_supabase_url if current_supabase_url else "MISSING",
+            "SUPABASE_ANON_KEY": mask_key(current_supabase_key),
+            "BREVO_API_KEY": mask_key(current_brevo_key),
+            "SENDER_EMAIL": current_sender_email if current_sender_email else "MISSING",
+            "GEMINI_API_KEY": mask_key(current_gemini_key),
+        },
+        "all_env_keys": sorted(list(os.environ.keys())),
+        "env_file_exists": os.path.exists(os.path.join(os.getcwd(), ".env")),
         "api_ready": True
     }
 
 @app.get("/api/tasks")
 async def list_tasks():
-    if not supabase: return []
+    client = get_supabase_client()
+    if not client: 
+        print("Supabase client not initialized")
+        return []
     try:
-        res = supabase.table("tasks").select("*").order("date").execute()
+        res = client.table("tasks").select("*").order("date").execute()
         return res.data if res.data else []
     except Exception as e:
         print(f"Supabase Select Error: {e}")
+        # If it's a 401, it might be an invalid key
+        if "401" in str(e) or "Unauthorized" in str(e):
+            raise HTTPException(status_code=401, detail=f"Supabase Authorization Error: {str(e)}")
         return []
 
 @app.post("/api/tasks")
 async def add_task(task: TaskItem):
-    if not supabase: raise HTTPException(status_code=503, detail="Database connection not initialized")
+    client = get_supabase_client()
+    if not client: raise HTTPException(status_code=503, detail="Database connection not initialized")
     try:
         data = task.dict(exclude_none=True)
         if 'id' in data: del data['id']
-        res = supabase.table("tasks").insert(data).execute()
+        res = client.table("tasks").insert(data).execute()
         return res.data[0]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.patch("/api/tasks/{task_id}/toggle")
 async def toggle(task_id: str):
-    if not supabase: raise HTTPException(status_code=503, detail="Database offline")
+    client = get_supabase_client()
+    if not client: raise HTTPException(status_code=503, detail="Database offline")
     try:
-        res = supabase.table("tasks").select("completed").eq("id", task_id).execute()
+        res = client.table("tasks").select("completed").eq("id", task_id).execute()
         if not res.data: raise HTTPException(status_code=404, detail="Task not found")
         new_val = not res.data[0]['completed']
-        supabase.table("tasks").update({"completed": new_val}).eq("id", task_id).execute()
+        client.table("tasks").update({"completed": new_val}).eq("id", task_id).execute()
         return {"status": "ok", "completed": new_val}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/tasks/{task_id}")
 async def remove_task(task_id: str):
-    if not supabase: raise HTTPException(status_code=503, detail="Database offline")
+    client = get_supabase_client()
+    if not client: raise HTTPException(status_code=503, detail="Database offline")
     try:
-        supabase.table("tasks").delete().eq("id", task_id).execute()
+        client.table("tasks").delete().eq("id", task_id).execute()
         return {"status": "deleted"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/settings")
 async def save_settings(settings: UserSettings):
-    if not supabase: raise HTTPException(status_code=503, detail="Database offline")
+    client = get_supabase_client()
+    if not client: raise HTTPException(status_code=503, detail="Database offline")
     try:
         # We use a fixed ID for single user settings for now
-        res = supabase.table("settings").upsert({
+        res = client.table("settings").upsert({
             "id": "main_user",
             "email": settings.email,
             "name": settings.name
@@ -203,9 +300,10 @@ async def save_settings(settings: UserSettings):
 
 @app.get("/api/settings")
 async def get_settings():
-    if not supabase: return {"email": "", "name": "Zen User"}
+    client = get_supabase_client()
+    if not client: return {"email": "", "name": "Zen User"}
     try:
-        res = supabase.table("settings").select("*").eq("id", "main_user").execute()
+        res = client.table("settings").select("*").eq("id", "main_user").execute()
         if res.data:
             return res.data[0]
         return {"email": "", "name": "Zen User"}
@@ -214,10 +312,11 @@ async def get_settings():
 
 @app.get("/api/cron")
 async def daily_cron_trigger():
-    if not supabase: return {"error": "Database offline"}
+    client = get_supabase_client()
+    if not client: return {"error": "Database offline"}
     try:
         # 1. Get User Settings
-        settings_res = supabase.table("settings").select("*").eq("id", "main_user").execute()
+        settings_res = client.table("settings").select("*").eq("id", "main_user").execute()
         if not settings_res.data:
             return {"error": "No user settings found. Please configure your email in the app."}
         
@@ -226,7 +325,7 @@ async def daily_cron_trigger():
 
         # 2. Get Today's Tasks
         today = datetime.date.today().isoformat()
-        res = supabase.table("tasks").select("*").eq("date", today).eq("completed", False).execute()
+        res = client.table("tasks").select("*").eq("date", today).eq("completed", False).execute()
         
         # 3. Generate AI Briefing
         briefing_html = await generate_gemini_briefing(res.data, user_name)

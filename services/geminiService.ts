@@ -7,7 +7,7 @@ import { Task, MorningBriefing } from "../types";
  * Uses Gemini 3 Flash for efficient, high-quality reasoning.
  */
 export async function generateMorningBriefing(tasks: Task[]): Promise<MorningBriefing> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   
   const taskListText = tasks.length > 0 
     ? tasks.map(t => `- ${t.title} (Priority: ${t.priority})`).join('\n')

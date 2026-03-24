@@ -58,7 +58,7 @@ const App: React.FC = () => {
       const data = await res.json();
       setHealth(data);
     } catch (e) {
-      setHealth({ status: 'offline' });
+      setHealth({ status: 'offline', supabase: false, gemini: false, brevo: false });
     }
   };
 
@@ -256,11 +256,70 @@ const App: React.FC = () => {
                 </form>
 
                 <div className="pt-10 border-t border-slate-100 space-y-6">
-                   <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Environment Diagnostics</h3>
-                   <div className="space-y-3">
-                      <HealthStatus label="Supabase DB" status={health?.supabase} />
-                      <HealthStatus label="Gemini AI" status={health?.api_ready} />
-                      <HealthStatus label="Brevo (Email)" status={health?.brevo} />
+                   <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center justify-between">
+                      Environment Diagnostics
+                      <div className="flex items-center gap-2">
+                         <button 
+                            onClick={checkHealth}
+                            className="p-1 hover:bg-slate-100 rounded-md transition-colors text-slate-400 hover:text-orange-500"
+                            title="Refresh Diagnostics"
+                         >
+                            <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+                         </button>
+                         <span className={`text-[8px] px-1.5 py-0.5 rounded-full ${health?.env_file_exists ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                            {health?.env_file_exists ? '.env loaded' : 'no .env file'}
+                         </span>
+                      </div>
+                   </h3>
+                   <div className="space-y-4">
+                      <div className="p-3 bg-orange-50 border border-orange-100 rounded-xl text-[10px] text-orange-700 leading-relaxed">
+                         <Sparkles size={12} className="inline mr-1 mb-0.5" />
+                         <strong>Zen Tip:</strong> Set these keys in the <b>Settings</b> menu (top right). They are injected into the environment automatically.
+                      </div>
+
+                      <div>
+                         <HealthStatus label="Supabase DB" status={health?.supabase} isOffline={health?.status === 'offline'} />
+                         <div className="ml-3 mt-1 space-y-1">
+                            <p className="text-[9px] text-slate-400 font-mono">Expected: <span className="text-slate-500">SUPABASE_URL</span>, <span className="text-slate-500">SUPABASE_ANON_KEY</span></p>
+                            <p className={`text-[10px] font-mono bg-slate-50 p-1 rounded border ${health?.masked_vars?.SUPABASE_URL === 'MISSING' ? 'border-red-100 text-red-400' : 'border-slate-100 text-slate-500'}`}>
+                               {health?.masked_vars?.SUPABASE_URL || 'MISSING'}
+                            </p>
+                         </div>
+                      </div>
+                      
+                      <div>
+                         <HealthStatus label="Gemini AI" status={health?.gemini} isOffline={health?.status === 'offline'} />
+                         <div className="ml-3 mt-1 space-y-1">
+                            <p className="text-[9px] text-slate-400 font-mono">Expected: <span className="text-slate-500">GEMINI_API_KEY</span></p>
+                            <p className={`text-[10px] font-mono bg-slate-50 p-1 rounded border ${health?.masked_vars?.GEMINI_API_KEY === 'MISSING' ? 'border-red-100 text-red-400' : 'border-slate-100 text-slate-500'}`}>
+                               {health?.masked_vars?.GEMINI_API_KEY || 'MISSING'}
+                            </p>
+                         </div>
+                      </div>
+                      
+                      <div>
+                         <HealthStatus label="Brevo (Email)" status={health?.brevo} isOffline={health?.status === 'offline'} />
+                         <div className="ml-3 mt-1 space-y-1">
+                            <p className="text-[9px] text-slate-400 font-mono">Expected: <span className="text-slate-500">BREVO_API_KEY</span>, <span className="text-slate-500">SENDER_EMAIL</span></p>
+                            <p className={`text-[10px] font-mono bg-slate-50 p-1 rounded border ${health?.masked_vars?.SENDER_EMAIL === 'MISSING' ? 'border-red-100 text-red-400' : 'border-slate-100 text-slate-500'}`}>
+                               {health?.masked_vars?.SENDER_EMAIL || 'MISSING EMAIL'}
+                            </p>
+                         </div>
+                      </div>
+
+                      {health?.all_env_keys && (
+                         <div className="pt-4 border-t border-slate-50">
+                            <p className="text-[8px] font-black uppercase tracking-widest text-slate-300 mb-2">Available Env Keys (Debug)</p>
+                            <div className="flex flex-wrap gap-1">
+                               {health.all_env_keys
+                                  .filter((k: string) => !k.startsWith('npm_') && !k.startsWith('NODE_') && !k.startsWith('VITE_'))
+                                  .map((k: string) => (
+                                     <span key={k} className="text-[8px] px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded-md font-mono">{k}</span>
+                                  ))
+                               }
+                            </div>
+                         </div>
+                      )}
                    </div>
                 </div>
              </div>
@@ -315,12 +374,12 @@ const App: React.FC = () => {
   );
 };
 
-const HealthStatus = ({ label, status }: { label: string, status: boolean }) => (
+const HealthStatus = ({ label, status, isOffline }: { label: string, status: boolean, isOffline?: boolean }) => (
   <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
     <span className="text-sm font-medium text-slate-600">{label}</span>
-    <div className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${status ? 'text-green-500' : 'text-red-400'}`}>
-       <div className={`w-2 h-2 rounded-full ${status ? 'bg-green-500' : 'bg-red-400'}`} />
-       {status ? 'Connected' : 'Missing Key'}
+    <div className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${isOffline ? 'text-slate-400' : status ? 'text-green-500' : 'text-red-400'}`}>
+       <div className={`w-2 h-2 rounded-full ${isOffline ? 'bg-slate-400' : status ? 'bg-green-500' : 'bg-red-400'}`} />
+       {isOffline ? 'Offline' : status ? 'Connected' : 'Missing Key'}
     </div>
   </div>
 );
