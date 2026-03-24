@@ -24,11 +24,33 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [health, setHealth] = useState<any>(null);
+  const [settings, setSettings] = useState({ email: '', name: '' });
+  const [newTask, setNewTask] = useState({ title: '', priority: 'medium' as TaskPriority });
 
   useEffect(() => {
     loadTasks();
     checkHealth();
+    loadSettings();
   }, []);
+
+  const loadSettings = async () => {
+    try {
+      const data = await apiService.getSettings();
+      setSettings(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await apiService.saveSettings(settings);
+      alert("Settings saved successfully!");
+    } catch (e) {
+      alert("Failed to save settings.");
+    }
+  };
 
   const checkHealth = async () => {
     try {
@@ -198,32 +220,49 @@ const App: React.FC = () => {
           <div className="max-w-xl mx-auto space-y-8 animate-in fade-in duration-700">
              <div className="bg-white p-12 rounded-[3rem] border border-slate-200 shadow-sm space-y-10">
                 <header>
-                   <h2 className="text-3xl font-serif italic font-bold">Cloud Infrastructure</h2>
-                   <p className="text-slate-400 text-sm mt-2">Manage your Vercel + Supabase connection.</p>
+                   <h2 className="text-3xl font-serif italic font-bold">Personalize Your Zen</h2>
+                   <p className="text-slate-400 text-sm mt-2">Configure your identity and delivery address.</p>
                 </header>
                 
-                <div className="space-y-6">
+                <form onSubmit={handleSaveSettings} className="space-y-6">
+                   <div className="space-y-2">
+                      <label className="text-xs font-black uppercase tracking-widest text-slate-400">Your Name</label>
+                      <input 
+                        type="text" 
+                        value={settings.name}
+                        onChange={e => setSettings({...settings, name: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all font-bold"
+                        placeholder="Zen Master"
+                        required
+                      />
+                   </div>
+                   <div className="space-y-2">
+                      <label className="text-xs font-black uppercase tracking-widest text-slate-400">Email Address</label>
+                      <input 
+                        type="email" 
+                        value={settings.email}
+                        onChange={e => setSettings({...settings, email: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all font-bold"
+                        placeholder="you@example.com"
+                        required
+                      />
+                   </div>
+                   <button 
+                    type="submit"
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-5 rounded-2xl shadow-xl shadow-orange-100 transition-all active:scale-[0.98]"
+                   >
+                     Save Configuration
+                   </button>
+                </form>
+
+                <div className="pt-10 border-t border-slate-100 space-y-6">
                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Environment Diagnostics</h3>
                    <div className="space-y-3">
                       <HealthStatus label="Supabase DB" status={health?.supabase} />
-                      <HealthStatus label="Gemini AI (Text)" status={health?.gemini} />
-                      <HealthStatus label="Brevo (Email Service)" status={health?.brevo} />
-                   </div>
-                   
-                   <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                      <div className="flex items-center gap-2 mb-2 text-xs font-bold text-slate-500">
-                         <Mail size={14}/> Registered Recipient
-                      </div>
-                      <p className="font-mono text-xs text-orange-600 bg-orange-50 p-2 rounded-lg">{health?.sender || 'Not set (SENDER_EMAIL)'}</p>
+                      <HealthStatus label="Gemini AI" status={health?.api_ready} />
+                      <HealthStatus label="Brevo (Email)" status={health?.brevo} />
                    </div>
                 </div>
-
-                {!health?.supabase && (
-                   <div className="p-6 bg-red-50 text-red-600 rounded-[1.5rem] flex gap-4 text-sm leading-relaxed border border-red-100">
-                      <AlertCircle className="shrink-0" size={20}/>
-                      <p><strong>Keys Missing:</strong> Please ensure <code>SUPABASE_URL</code>, <code>SUPABASE_ANON_KEY</code>, <code>API_KEY</code>, <code>BREVO_API_KEY</code>, and <code>SENDER_EMAIL</code> are defined in your Vercel Dashboard Environment Variables.</p>
-                   </div>
-                )}
              </div>
           </div>
         )}
@@ -233,24 +272,42 @@ const App: React.FC = () => {
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-[2.5rem] w-full max-w-lg p-10 shadow-2xl animate-in zoom-in duration-200">
              <h2 className="text-3xl font-serif italic font-bold mb-8">Set Intention</h2>
-             <form className="space-y-6" onSubmit={(e) => {
-               e.preventDefault();
-               const f = new FormData(e.currentTarget);
-               handleAddTask({
-                 title: f.get('title'),
-                 description: f.get('desc'),
-                 date: f.get('date'),
-                 priority: 'MEDIUM'
-               });
-             }}>
-               <input name="title" required autoFocus placeholder="Goal Title" className="w-full text-2xl font-serif border-b-2 py-2 focus:outline-none focus:border-orange-500 transition-colors" />
-               <textarea name="desc" placeholder="Supporting notes..." className="w-full p-4 bg-slate-50 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-100" rows={3}/>
-               <input name="date" type="date" required className="w-full p-4 bg-slate-50 rounded-2xl font-bold" defaultValue={new Date().toISOString().split('T')[0]} />
-               <div className="flex gap-4 pt-4">
-                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 font-bold text-slate-400 hover:text-slate-600">Dismiss</button>
-                 <button type="submit" className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all">Seal Intention</button>
-               </div>
-             </form>
+              <form className="space-y-6" onSubmit={(e) => {
+                e.preventDefault();
+                handleAddTask({
+                  ...newTask,
+                  date: new Date().toISOString().split('T')[0]
+                });
+              }}>
+                <input 
+                  name="title" 
+                  required 
+                  autoFocus 
+                  placeholder="Goal Title" 
+                  value={newTask.title}
+                  onChange={e => setNewTask({...newTask, title: e.target.value})}
+                  className="w-full text-2xl font-serif border-b-2 py-2 focus:outline-none focus:border-orange-500 transition-colors" 
+                />
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase tracking-widest text-slate-400">Priority</label>
+                  <div className="flex gap-2">
+                    {(['low', 'medium', 'high'] as const).map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setNewTask({...newTask, priority: p as TaskPriority})}
+                        className={`flex-1 py-3 rounded-xl font-bold capitalize transition-all ${newTask.priority === p ? 'bg-orange-500 text-white shadow-lg shadow-orange-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-4 pt-4">
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 font-bold text-slate-400 hover:text-slate-600">Dismiss</button>
+                  <button type="submit" className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all">Seal Intention</button>
+                </div>
+              </form>
           </div>
         </div>
       )}

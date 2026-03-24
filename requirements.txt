@@ -1,7 +1,7 @@
 
 fastapi
-uvicorn
-supabase
 pydantic
-sib-api-v3-sdk
-google-generativeai
+supabase
+httpx
+google-genai
+uvicorn

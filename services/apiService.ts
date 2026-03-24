@@ -45,5 +45,19 @@ export const apiService = {
   async triggerManualBriefing(): Promise<void> {
     const response = await fetch(`${BASE_URL}/cron`);
     await handleResponse(response);
+  },
+
+  async getSettings(): Promise<{ email: string; name: string }> {
+    const response = await fetch(`${BASE_URL}/settings`);
+    return await handleResponse(response);
+  },
+
+  async saveSettings(settings: { email: string; name: string }): Promise<void> {
+    const response = await fetch(`${BASE_URL}/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    await handleResponse(response);
   }
 };
