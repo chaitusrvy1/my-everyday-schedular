@@ -279,6 +279,11 @@ const App: React.FC = () => {
 
                       <div>
                          <HealthStatus label="Supabase DB" status={health?.supabase} isOffline={health?.status === 'offline'} />
+                          {health?.supabase_connection && (
+                             <p className={`text-[9px] font-medium mt-1 ml-3 ${health.supabase_connection === 'Connected' ? 'text-emerald-500' : 'text-red-500'}`}>
+                                Connection: {health.supabase_connection}
+                             </p>
+                          )}
                          <div className="ml-3 mt-1 space-y-1">
                             <p className="text-[9px] text-slate-400 font-mono">Expected: <span className="text-slate-500">SUPABASE_URL</span>, <span className="text-slate-500">SUPABASE_ANON_KEY</span></p>
                             <p className={`text-[10px] font-mono bg-slate-50 p-1 rounded border ${health?.masked_vars?.SUPABASE_URL === 'MISSING' ? 'border-red-100 text-red-400' : 'border-slate-100 text-slate-500'}`}>
