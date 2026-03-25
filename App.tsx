@@ -220,7 +220,7 @@ const App: React.FC = () => {
           <div className="max-w-xl mx-auto space-y-8 animate-in fade-in duration-700">
              <div className="bg-white p-12 rounded-[3rem] border border-slate-200 shadow-sm space-y-10">
                 <header>
-                   <h2 className="text-3xl font-serif italic font-bold">Personalize Your Zen</h2>
+                   <h2 className="text-3xl font-serif italic font-bold">Zen Profile</h2>
                    <p className="text-slate-400 text-sm mt-2">Configure your identity and delivery address.</p>
                 </header>
                 
@@ -257,7 +257,7 @@ const App: React.FC = () => {
 
                 <div className="pt-10 border-t border-slate-100 space-y-6">
                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center justify-between">
-                      Environment Diagnostics
+                      System Diagnostics
                       <div className="flex items-center gap-2">
                          <button 
                             onClick={checkHealth}
@@ -285,7 +285,7 @@ const App: React.FC = () => {
                              </p>
                           )}
                          <div className="ml-3 mt-1 space-y-1">
-                            <p className="text-[9px] text-slate-400 font-mono">Expected: <span className="text-slate-500">SUPABASE_URL</span>, <span className="text-slate-500">SUPABASE_ANON_KEY</span></p>
+                            <p className="text-[9px] text-slate-400 font-mono">Keys: <span className="text-slate-500">SUPABASE_URL</span>, <span className="text-slate-500">SUPABASE_ANON_KEY</span></p>
                             <p className={`text-[10px] font-mono bg-slate-50 p-1 rounded border ${health?.masked_vars?.SUPABASE_URL === 'MISSING' ? 'border-red-100 text-red-400' : 'border-slate-100 text-slate-500'}`}>
                                {health?.masked_vars?.SUPABASE_URL || 'MISSING'}
                             </p>
@@ -295,7 +295,7 @@ const App: React.FC = () => {
                       <div>
                          <HealthStatus label="Gemini AI" status={health?.gemini} isOffline={health?.status === 'offline'} />
                          <div className="ml-3 mt-1 space-y-1">
-                            <p className="text-[9px] text-slate-400 font-mono">Expected: <span className="text-slate-500">GEMINI_API_KEY</span></p>
+                            <p className="text-[9px] text-slate-400 font-mono">Key: <span className="text-slate-500">GEMINI_API_KEY</span></p>
                             <p className={`text-[10px] font-mono bg-slate-50 p-1 rounded border ${health?.masked_vars?.GEMINI_API_KEY === 'MISSING' ? 'border-red-100 text-red-400' : 'border-slate-100 text-slate-500'}`}>
                                {health?.masked_vars?.GEMINI_API_KEY || 'MISSING'}
                             </p>
@@ -305,21 +305,24 @@ const App: React.FC = () => {
                       <div>
                          <HealthStatus label="Brevo (Email)" status={health?.brevo} isOffline={health?.status === 'offline'} />
                          <div className="ml-3 mt-1 space-y-1">
-                            <p className="text-[9px] text-slate-400 font-mono">Expected: <span className="text-slate-500">BREVO_API_KEY</span>, <span className="text-slate-500">SENDER_EMAIL</span></p>
+                            <p className="text-[9px] text-slate-400 font-mono">Keys: <span className="text-slate-500">BREVO_API_KEY</span>, <span className="text-slate-500">SENDER_EMAIL</span></p>
                             <p className={`text-[10px] font-mono bg-slate-50 p-1 rounded border ${health?.masked_vars?.SENDER_EMAIL === 'MISSING' ? 'border-red-100 text-red-400' : 'border-slate-100 text-slate-500'}`}>
                                {health?.masked_vars?.SENDER_EMAIL || 'MISSING EMAIL'}
                             </p>
                          </div>
                       </div>
 
-                      {health?.all_env_keys && (
+                      {health?.all_env_vars_masked && (
                          <div className="pt-4 border-t border-slate-50">
-                            <p className="text-[8px] font-black uppercase tracking-widest text-slate-300 mb-2">Available Env Keys (Debug)</p>
-                            <div className="flex flex-wrap gap-1">
-                               {health.all_env_keys
-                                  .filter((k: string) => !k.startsWith('npm_') && !k.startsWith('NODE_') && !k.startsWith('VITE_'))
-                                  .map((k: string) => (
-                                     <span key={k} className="text-[8px] px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded-md font-mono">{k}</span>
+                            <p className="text-[8px] font-black uppercase tracking-widest text-slate-300 mb-2">Detailed Env Vars (Debug)</p>
+                            <div className="space-y-1">
+                               {Object.entries(health.all_env_vars_masked)
+                                  .filter(([k]) => !k.startsWith('npm_') && !k.startsWith('NODE_'))
+                                  .map(([k, v]) => (
+                                     <div key={k} className="flex items-center justify-between text-[8px] font-mono">
+                                        <span className="text-slate-400">{k}:</span>
+                                        <span className="text-slate-500 bg-slate-100 px-1 rounded">{v as string}</span>
+                                     </div>
                                   ))
                                }
                             </div>
